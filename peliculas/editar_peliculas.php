@@ -1,5 +1,4 @@
 <?php
-
 session_start();
 
 // Verificar si el usuario está autenticado
@@ -8,7 +7,7 @@ if (!isset($_SESSION['usuario_id'])) {
     exit();
 }
 
-include 'includes/conexion.php'; // Ajusta la ruta para incluir conexion.php
+include '../includes/conexion.php'; // Ajusta la ruta para incluir conexion.php
 
 // Verificar si se ha pasado el ID de la película
 if (!isset($_GET['id'])) {

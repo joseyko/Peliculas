@@ -1,3 +1,13 @@
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+if (isset($_SESSION['usuario_id'])) {
+    header("Location: ../peliculas/peliculas.php");
+    exit();
+}
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -20,7 +30,7 @@
     <div class="container">
         <div class="login-container">
             <h2 class="text-center">Iniciar Sesión</h2>
-            <form action="auth/login.php" method="POST" class="needs-validation" novalidate> <!-- Añadida la clase -->
+            <form action="login.php" method="POST" class="needs-validation" novalidate>
                 <div class="form-group">
                     <label for="email">Correo Electrónico</label>
                     <input type="email" name="email" class="form-control" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
@@ -34,53 +44,53 @@
                 <button type="submit" class="btn btn-primary btn-block">Iniciar Sesión</button>
             </form>
 
-            <!-- Botón para recuperar contraseña -->
             <div class="mt-3 text-center">
                 <a href="recuperar_contraseña.php">¿Olvidaste tu contraseña?</a>
             </div>
 
             <?php
             if ($_SERVER["REQUEST_METHOD"] == "POST") {
-                include '../includes/conexion.php'; // Ajusta la ruta
-                
-                // Preparar la consulta para evitar inyecciones SQL
-                $stmt = $conn->prepare("SELECT * FROM usuarios WHERE email = ?");
-                $stmt->bind_param("s", $email);
-                
-                $email = $_POST['email'];
-                $contrasena = $_POST['contrasena'];
-
-                $stmt->execute();
-                $resultado = $stmt->get_result();
-
-                if ($resultado->num_rows > 0) {
-                    $usuario = $resultado->fetch_assoc();
-
-                    // Verificar la contraseña
-                    if (password_verify($contrasena, $usuario['contrasena'])) {
-                        // Inicio de sesión exitoso
-                        session_start();
-                        $_SESSION['usuario_id'] = $usuario['id'];
-                        $_SESSION['nombre_usuario'] = $usuario['nombre_usuario'];
-
-                        header("Location: ../peliculas/peliculas.php"); // Redirigir a películas
-                        exit();
-                    } else {
-                        echo "<div class='alert alert-danger mt-3'>Contraseña incorrecta.</div>";
-                    }
-                } else {
-                    echo "<div class='alert alert-danger mt-3'>El usuario no existe.</div>";
+                include '../includes/conexion.php';
+                if (!$conn) {
+                    die("Error: No se pudo conectar a la base de datos.");
                 }
 
-                $stmt->close();
-                $conn->close();
+                $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
+                $contrasena = htmlspecialchars($_POST['contrasena'], ENT_QUOTES, 'UTF-8');
+
+                if (empty($email) || empty($contrasena)) {
+                    echo "<div class='alert alert-danger mt-3'>Por favor, complete todos los campos.</div>";
+                } else {
+                    $stmt = $conn->prepare("SELECT * FROM usuarios WHERE email = ?");
+                    $stmt->bind_param("s", $email);
+                    $stmt->execute();
+                    $resultado = $stmt->get_result();
+
+                    if ($resultado->num_rows > 0) {
+                        $usuario = $resultado->fetch_assoc();
+
+                        if (password_verify($contrasena, $usuario['contrasena'])) {
+                            $_SESSION['usuario_id'] = $usuario['id'];
+                            $_SESSION['nombre_usuario'] = $usuario['nombre_usuario'];
+
+                            header("Refresh: 2; URL=../peliculas/peliculas.php");
+                            exit();
+                        } else {
+                            echo "<div class='alert alert-danger mt-3'>La contraseña es incorrecta.</div>";
+                        }
+                    } else {
+                        echo "<div class='alert alert-danger mt-3'>No se encontró una cuenta asociada con ese correo.</div>";
+                    }
+
+                    $stmt->close();
+                    $conn->close();
+                }
             }
             ?>
         </div>
     </div>
 
     <script>
-        // Script para la validación de formulario de Bootstrap
         (function () {
             'use strict';
             window.addEventListener('load', function () {

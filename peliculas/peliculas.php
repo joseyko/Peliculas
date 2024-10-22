@@ -8,7 +8,8 @@ if (!isset($_SESSION['usuario_id'])) {
     exit();
 }
 
-include 'includes/conexion.php';
+// Corregir la ruta del archivo de conexión
+include '../includes/conexion.php'; // Ajusta la ruta correcta
 
 // Obtener la búsqueda, si existe
 $buscar = isset($_GET['buscar']) ? $_GET['buscar'] : '';
@@ -60,6 +61,9 @@ $resultado = $stmt->get_result();
             max-height: 200px; /* Ajustar la altura máxima de la imagen */
             object-fit: contain; /* Mantener las proporciones de la imagen */
         }
+        .imagen-error {
+            color: red;
+        }
     </style>
 </head>
 <body>
@@ -69,7 +73,7 @@ $resultado = $stmt->get_result();
         <p class="text-center">Bienvenido, <?php echo htmlspecialchars($_SESSION['nombre_usuario']); ?>. Aquí está la lista de películas.</p>
         
         <div class="text-right mb-3">
-            <a href="auth/logout.php" class="btn btn-danger">Cerrar Sesión</a>
+            <a href="../auth/logout.php" class="btn btn-danger">Cerrar Sesión</a>
         </div>
 
         <?php if (isset($_GET['mensaje'])): ?>
@@ -90,7 +94,18 @@ $resultado = $stmt->get_result();
             <?php while ($pelicula = $resultado->fetch_assoc()): ?>
                 <div class="col-md-4">
                     <div class="card">
-                        <img src="<?php echo htmlspecialchars($pelicula['imagen']); ?>" alt="<?php echo htmlspecialchars($pelicula['titulo']); ?>" class="card-img-top">
+                        <?php
+                        // Generar la ruta completa de la imagen
+                        $imagenRuta = 'assets/imagenes/' . htmlspecialchars($pelicula['imagen']);
+                        
+                        // Verificar si el archivo de imagen existe
+                        if (file_exists($imagenRuta) && !empty($pelicula['imagen'])) {
+                            echo '<img src="' . $imagenRuta . '" alt="' . htmlspecialchars($pelicula['titulo']) . '" class="card-img-top">';
+                        } else {
+                            echo '<img src="assets/imagenes/default.jpg" alt="Imagen no disponible" class="card-img-top">'; // Imagen por defecto
+                            echo '<p class="imagen-error">Imagen no encontrada para: ' . htmlspecialchars($pelicula['titulo']) . '</p>';
+                        }
+                        ?>
                         <div class="card-body">
                             <h5 class="card-title"><?php echo htmlspecialchars($pelicula['titulo']); ?></h5>
                             <p class="card-text"><?php echo htmlspecialchars($pelicula['descripcion']); ?></p>
@@ -116,6 +131,7 @@ $resultado = $stmt->get_result();
                     </div>
                 </div>
             <?php endwhile; ?>
+            
         </div>
 
         <?php

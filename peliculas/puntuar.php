@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'includes/conexion.php'; // Asegurarse de incluir la conexión desde la carpeta includes
+include '../includes/conexion.php'; // Asegurarse de incluir la conexión desde la carpeta includes
 
 // Verificar si el usuario está autenticado
 if (!isset($_SESSION['usuario_id'])) {

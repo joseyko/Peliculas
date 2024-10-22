@@ -7,7 +7,7 @@ if (!isset($_SESSION['usuario_id'])) {
     exit();
 }
 
-include 'includes/conexion.php'; // Ajusta la ruta para incluir conexion.php
+include '../includes/conexion.php'; // Ajusta la ruta para incluir conexion.php
 
 // Manejar el envío del formulario
 if ($_SERVER["REQUEST_METHOD"] == "POST") {

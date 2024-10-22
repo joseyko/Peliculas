@@ -5,6 +5,8 @@ error_reporting(E_ALL);
 
 session_start();
 
+echo "Formulario enviado"; // Para verificar si se accede a este archivo
+
 // Verificar si el usuario está autenticado
 if (!isset($_SESSION['usuario_id'])) {
     // Si no está autenticado, redirigir al inicio de sesión
@@ -12,7 +14,12 @@ if (!isset($_SESSION['usuario_id'])) {
     exit();
 }
 
-include 'includes/conexion.php'; // Ajusta la ruta para incluir conexion.php
+include '../includes/conexion.php'; // Ajusta la ruta para incluir conexion.php
+
+// Verificar la conexión a la base de datos
+if ($conn->connect_error) {
+    die("Conexión fallida: " . $conn->connect_error);
+}
 
 // Manejar el envío del formulario
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -22,34 +29,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Procesar la imagen
     $imagen = $_FILES['imagen'];
-    $ruta_imagen = 'imagenes/' . basename($imagen['name']); // Ruta donde se guardará la imagen
-
-    // Depurar la carga de la imagen
-    var_dump($_FILES['imagen']); // Verificar que la imagen se esté cargando
+    $ruta_imagen = 'assets/imagenes/' . basename($imagen['name']); // Cambiado a ruta relativa para la base de datos
 
     // Mover la imagen a la carpeta deseada
-    if (move_uploaded_file($imagen['tmp_name'], $ruta_imagen)) {
+    if (move_uploaded_file($imagen['tmp_name'], '../' . $ruta_imagen)) { // Añadir '../' para asegurar que la imagen se mueve correctamente
         // Preparar la consulta para insertar la película
         $stmt = $conn->prepare("INSERT INTO peliculas (titulo, descripcion, fecha_estreno, imagen) VALUES (?, ?, ?, ?)");
         $stmt->bind_param("ssss", $titulo, $descripcion, $fecha_estreno, $ruta_imagen);
-        $stmt->execute();
         
-        // Obtener el ID de la nueva película
-        $pelicula_id = $conn->insert_id;
+        if ($stmt->execute()) {
+            // Obtener el ID de la nueva película
+            $pelicula_id = $conn->insert_id;
 
-        // Insertar los géneros relacionados
-        $generos = $_POST['generos']; // Array de géneros seleccionados
-        foreach ($generos as $genero_id) {
-            $stmt = $conn->prepare("INSERT INTO pelicula_genero (pelicula_id, genero_id) VALUES (?, ?)");
-            $stmt->bind_param("ii", $pelicula_id, $genero_id);
-            $stmt->execute();
+            // Insertar los géneros relacionados
+            $generos = $_POST['generos']; // Array de géneros seleccionados
+            foreach ($generos as $genero_id) {
+                $stmt = $conn->prepare("INSERT INTO pelicula_genero (pelicula_id, genero_id) VALUES (?, ?)");
+                $stmt->bind_param("ii", $pelicula_id, $genero_id);
+                $stmt->execute();
+            }
+
+            // Redirigir a la lista de películas con un mensaje de éxito
+            header("Location: peliculas.php?mensaje=Película agregada con éxito");
+            exit();
+        } else {
+            echo "<div class='alert alert-danger'>Error al agregar la película: " . $stmt->error . "</div>";
         }
-
-        // Redirigir a la lista de películas con un mensaje de éxito
-        header("Location: peliculas.php?mensaje=Película agregada con éxito");
-        exit();
     } else {
-        echo "<div class='alert alert-danger'>Error al subir la imagen " . $imagen['error'] . "</div>";
+        echo "<div class='alert alert-danger'>Error al subir la imagen: " . $imagen['error'] . "</div>";
     }
 }
 
