@@ -96,13 +96,13 @@ $resultado = $stmt->get_result();
                     <div class="card">
                         <?php
                         // Generar la ruta completa de la imagen
-                        $imagenRuta = 'assets/imagenes/' . htmlspecialchars($pelicula['imagen']);
+                        $imagenRuta = '../assets/' . htmlspecialchars($pelicula['imagen']);
                         
                         // Verificar si el archivo de imagen existe
                         if (file_exists($imagenRuta) && !empty($pelicula['imagen'])) {
                             echo '<img src="' . $imagenRuta . '" alt="' . htmlspecialchars($pelicula['titulo']) . '" class="card-img-top">';
                         } else {
-                            echo '<img src="assets/imagenes/default.jpg" alt="Imagen no disponible" class="card-img-top">'; // Imagen por defecto
+                            echo '<img src="../assets/imagenes/default.png" alt="Imagen no disponible" class="card-img-top">'; // Imagen por defecto
                             echo '<p class="imagen-error">Imagen no encontrada para: ' . htmlspecialchars($pelicula['titulo']) . '</p>';
                         }
                         ?>
