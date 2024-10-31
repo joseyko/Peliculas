@@ -1,31 +1,29 @@
 <?php
 session_start();
-include '../includes/conexion.php'; // Asegurarse de incluir la conexión desde la carpeta includes
+include '../includes/conexion.php';
 
-// Verificar si el usuario está autenticado
-if (!isset($_SESSION['usuario_id'])) {
-    header("Location: auth/login.php"); // Redirigir a la página de inicio de sesión
-    exit();
+$usuario_id = $_SESSION['usuario_id'];
+$movie_id = $_POST['movie_id'];
+$calificacion = $_POST['calificacion'];
+
+// Verificar si ya existe una puntuación para esta película
+$stmt = $conn->prepare("SELECT * FROM calificaciones WHERE usuario_id = ? AND movie_id = ?");
+$stmt->bind_param("ii", $usuario_id, $movie_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($result->num_rows > 0) {
+    // Actualizar la calificación
+    $stmt = $conn->prepare("UPDATE calificaciones SET calificacion = ? WHERE usuario_id = ? AND movie_id = ?");
+    $stmt->bind_param("iii", $calificacion, $usuario_id, $movie_id);
+} else {
+    // Insertar nueva calificación
+    $stmt = $conn->prepare("INSERT INTO calificaciones (usuario_id, movie_id, calificacion) VALUES (?, ?, ?)");
+    $stmt->bind_param("iii", $usuario_id, $movie_id, $calificacion);
 }
 
-// Manejar el envío del formulario
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $pelicula_id = $_POST['pelicula_id'];
-    $puntuacion = $_POST['puntuacion'];
-    $usuario_id = $_SESSION['usuario_id'];
+$stmt->execute();
 
-    // Preparar la consulta para insertar la puntuación
-    $stmt = $conn->prepare("INSERT INTO puntuaciones (usuario_id, pelicula_id, puntuacion) VALUES (?, ?, ?)");
-    $stmt->bind_param("iii", $usuario_id, $pelicula_id, $puntuacion);
-    
-    if ($stmt->execute()) {
-        header("Location: peliculas.php?mensaje=Puntuación registrada con éxito");
-    } else {
-        echo "<div class='alert alert-danger'>Error al registrar la puntuación: " . $conn->error . "</div>"; // Mostrar mensaje de error
-    }
-
-    $stmt->close();
-    $conn->close();
-    exit();
-}
+header("Location: peliculas.php");
+exit();
 ?>

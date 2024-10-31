@@ -48,6 +48,10 @@ if (isset($_SESSION['usuario_id'])) {
                 <a href="recuperar_contraseña.php">¿Olvidaste tu contraseña?</a>
             </div>
 
+            <div class="mt-3 text-center">
+                <button class="btn btn-secondary" onclick="window.location.href='../prueba.php'">Volver</button>
+            </div>
+
             <?php
             if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 include '../includes/conexion.php';

@@ -5,7 +5,8 @@ $contrasena = "";                 // Contraseña por defecto es vacía en XAMPP
 $base_datos = "peliculas_db";     // Asegúrate de que el nombre de la base de datos es correcto
 
 // Crear la conexión
-$conn = new mysqli($servidor, $usuario, $contrasena, $base_datos);
+$conn = new mysqli('localhost:3306', 'root', '', 'peliculas_db');
+
 
 // Verificar la conexión
 if ($conn->connect_error) {

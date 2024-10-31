@@ -24,6 +24,11 @@
             </div>
             <button type="submit" class="btn btn-primary">Registrarse</button>
         </form>
+
+        <!-- Botón para volver a la página de inicio -->
+        <div class="mt-3">
+            <button class="btn btn-secondary" onclick="window.location.href='../prueba.php'">Volver</button>
+        </div>
     </div>
 
     <?php
