@@ -27,6 +27,25 @@ if (!$data || isset($data['status_code'])) {
     exit();
 }
 
+// Inicializar $estado con un valor predeterminado
+$estado = 'Por Ver';
+
+// Verificar si el usuario ha visto la película y cargar el estado si existe
+if (isset($_SESSION['usuario_id'])) {
+    $usuario_id = $_SESSION['usuario_id'];
+    $stmt = $conn->prepare("SELECT estado FROM historial WHERE usuario_id = ? AND pelicula_id = ?");
+    $stmt->bind_param("ii", $usuario_id, $movie_id); // Usa `pelicula_id` en la consulta
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $estado = $row['estado'];
+    }
+    $stmt->close();
+}
+
+
+
 // Solicitud para obtener trailers y videos de la película
 $videos_url = 'https://api.themoviedb.org/3/movie/' . $movie_id . '/videos?api_key=' . $api_key;
 $videos_response = file_get_contents($videos_url);
@@ -34,6 +53,19 @@ $videos_data = json_decode($videos_response, true);
 
 // URL base para obtener imágenes de TMDb
 $image_base_url = 'https://image.tmdb.org/t/p/w500';
+
+
+$usuario_id = isset($_SESSION['usuario_id']) ? $_SESSION['usuario_id'] : null;
+$en_favoritos = false;
+
+if ($usuario_id) {
+    $stmt = $conn->prepare("SELECT * FROM favoritos WHERE usuario_id = ? AND movie_id = ?");
+    $stmt->bind_param("ii", $usuario_id, $movie_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $en_favoritos = $result->num_rows > 0;
+    $stmt->close();
+}
 ?>
 
 <!DOCTYPE html>
@@ -89,8 +121,45 @@ $image_base_url = 'https://image.tmdb.org/t/p/w500';
                 </ul>
                 
                 <a href="peliculas.php" class="btn btn-primary mt-3">Volver a la lista</a>
+
+         <!-- Botón de Favoritos -->
+         <?php if ($usuario_id): ?>
+                    <button id="favoritos-btn" class="btn btn-<?php echo $en_favoritos ? 'danger' : 'secondary'; ?> mt-3">
+                        <?php echo $en_favoritos ? 'Eliminar de Favoritos' : 'Añadir a Favoritos'; ?>
+                    </button>
+                <?php else: ?>
+                    <p>Inicia sesión para agregar a favoritos.</p>
+                <?php endif; ?>
             </div>
         </div>
+        <?php
+// Obtener las listas personalizadas del usuario
+$stmt_listas = $conn->prepare("SELECT id, nombre FROM listas WHERE usuario_id = ?");
+$stmt_listas->bind_param("i", $usuario_id);
+$stmt_listas->execute();
+$listas_usuario = $stmt_listas->get_result();
+?>
+
+<!-- Formulario para agregar a lista personalizada -->
+<?php if ($listas_usuario->num_rows > 0): ?>
+    <form action="agregar_a_lista.php" method="POST" class="mt-3">
+        <input type="hidden" name="pelicula_id" value="<?php echo $movie_id; ?>">
+        <label for="lista_id">Añadir a una lista:</label>
+        <select name="lista_id" required>
+            <?php while ($lista = $listas_usuario->fetch_assoc()): ?>
+                <option value="<?php echo $lista['id']; ?>"><?php echo htmlspecialchars($lista['nombre']); ?></option>
+            <?php endwhile; ?>
+        </select>
+        <button type="submit" class="btn btn-primary">Añadir</button>
+    </form>
+<?php else: ?>
+    <p>No tienes listas personalizadas. <a href="crear_lista.php">Crea una aquí</a>.</p>
+<?php endif; ?>
+
+<?php
+$stmt_listas->close();
+?>
+
 
         <!-- Sección de Trailer -->
         <div class="row mt-5">
@@ -147,6 +216,24 @@ $image_base_url = 'https://image.tmdb.org/t/p/w500';
                         <p>Aún no hay calificaciones para esta película.</p>
                     <?php endif; ?>
                 </div>
+                <?php if (isset($_SESSION['usuario_id'])): ?>
+    <div class="mt-4">
+        <h4>Progreso de Visualización</h4>
+        <form action="actualizar_progreso.php" method="POST">
+            <input type="hidden" name="movie_id" value="<?php echo $movie_id; ?>">
+            <label for="estado">Estado:</label>
+            <select name="estado" required>
+                <option value="Por Ver" <?php if ($estado === 'Por Ver') echo 'selected'; ?>>Por Ver</option>
+                <option value="En Progreso" <?php if ($estado === 'En Progreso') echo 'selected'; ?>>En Progreso</option>
+                <option value="Visto" <?php if ($estado === 'Visto') echo 'selected'; ?>>Visto</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Actualizar</button>
+        </form>
+    </div>
+<?php else: ?>
+    <p>Debes <a href="../auth/login2.php">iniciar sesión</a> para actualizar tu progreso.</p>
+<?php endif; ?>
+
                 
                 <!-- Formulario para comentarios -->
                 <?php
@@ -193,5 +280,28 @@ $image_base_url = 'https://image.tmdb.org/t/p/w500';
             </div>
         </div>
     </div>
+    <script>
+    document.getElementById('favoritos-btn').addEventListener('click', function () {
+        const btn = this;
+        const movieId = <?php echo $movie_id; ?>;
+
+        fetch('favoritos.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `movie_id=${movieId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                btn.classList.toggle('btn-danger');
+                btn.classList.toggle('btn-secondary');
+                btn.textContent = btn.classList.contains('btn-danger') ? 'Eliminar de Favoritos' : 'Añadir a Favoritos';
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+    </script>
 </body>
 </html>

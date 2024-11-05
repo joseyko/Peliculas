@@ -1,152 +1,178 @@
 <?php
 session_start();
 
-// Verificar si el usuario está autenticado
+include_once '../includes/conexion.php';
+
 if (!isset($_SESSION['usuario_id'])) {
-    header("Location: auth/login.php");
+    header("Location: ../auth/login2.php");
     exit();
 }
 
-include '../includes/conexion.php';
-
-// Obtener la información del usuario
 $usuario_id = $_SESSION['usuario_id'];
-$sql_usuario = "SELECT nombre_usuario, email FROM usuarios WHERE id = ?";
-$stmt = $conn->prepare($sql_usuario);
-$stmt->bind_param("i", $usuario_id);
-$stmt->execute();
-$resultado = $stmt->get_result();
-$usuario = $resultado->fetch_assoc();
 
-// Manejar la actualización del perfil
-$error = ''; // Inicializar la variable de error
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['actualizar_perfil'])) {
-    $nuevo_nombre = trim($_POST['nombre_usuario']);
-    $nuevo_email = trim($_POST['email']);
 
-    // Validar que el nuevo correo electrónico no esté ya en uso
-    $sql_email_check = "SELECT id FROM usuarios WHERE email = ? AND id != ?";
-    $stmt_email_check = $conn->prepare($sql_email_check);
-    $stmt_email_check->bind_param("si", $nuevo_email, $usuario_id);
-    $stmt_email_check->execute();
-    $resultado_email_check = $stmt_email_check->get_result();
-
-    if ($resultado_email_check->num_rows > 0) {
-        $error = "El correo electrónico ya está en uso.";
-    } else {
-        $sql_actualizar = "UPDATE usuarios SET nombre_usuario = ?, email = ? WHERE id = ?";
-        $stmt_actualizar = $conn->prepare($sql_actualizar);
-        $stmt_actualizar->bind_param("ssi", $nuevo_nombre, $nuevo_email, $usuario_id);
-
-        if ($stmt_actualizar->execute()) {
-            $_SESSION['nombre_usuario'] = $nuevo_nombre;  // Actualizar el nombre en la sesión
-            header("Location: perfil.php?mensaje=Perfil actualizado con éxito");
-            exit();
-        } else {
-            $error = "Error al actualizar el perfil.";
-        }
-    }
+function obtenerHistorialVisualizacion($usuario_id, $conn) {
+    $stmt = $conn->prepare("
+        SELECT h.fecha_visualizacion, h.calificacion, h.comentario, h.estado, p.titulo 
+        FROM historial h
+        JOIN peliculas p ON h.pelicula_id = p.id
+        WHERE h.usuario_id = ?
+        ORDER BY h.fecha_visualizacion DESC
+    ");
+    $stmt->bind_param("i", $usuario_id);
+    $stmt->execute();
+    return $stmt->get_result();
 }
 
-// Manejar el cambio de contraseña
-$error_contrasena = ''; // Inicializar la variable de error
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cambiar_contrasena'])) {
-    $contrasena_actual = $_POST['contrasena_actual'];
-    $nueva_contrasena = $_POST['nueva_contrasena'];
-    $confirmar_contrasena = $_POST['confirmar_contrasena'];
 
-    // Verificar la contraseña actual
-    $sql_contrasena = "SELECT contrasena FROM usuarios WHERE id = ?";
-    $stmt_contrasena = $conn->prepare($sql_contrasena);
-    $stmt_contrasena->bind_param("i", $usuario_id);
-    $stmt_contrasena->execute();
-    $resultado_contrasena = $stmt_contrasena->get_result();
-    $usuario_contrasena = $resultado_contrasena->fetch_assoc();
+// Función para obtener favoritos y usar la API para los detalles de cada película
+function obtenerFavoritos($usuario_id, $conn) {
+    $stmt = $conn->prepare("SELECT movie_id FROM favoritos WHERE usuario_id = ?");
+    $stmt->bind_param("i", $usuario_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    if (password_verify($contrasena_actual, $usuario_contrasena['contrasena'])) {
-        if ($nueva_contrasena === $confirmar_contrasena) {
-            // Cambiar la contraseña
-            $hash_contrasena = password_hash($nueva_contrasena, PASSWORD_DEFAULT);
-            $sql_actualizar_contrasena = "UPDATE usuarios SET contrasena = ? WHERE id = ?";
-            $stmt_actualizar_contrasena = $conn->prepare($sql_actualizar_contrasena);
-            $stmt_actualizar_contrasena->bind_param("si", $hash_contrasena, $usuario_id);
+    $favoritos = [];
+    $api_key = '56ca5cf36846fb5c1465bf82478749b5';
+    $image_base_url = 'https://image.tmdb.org/t/p/w500';
 
-            if ($stmt_actualizar_contrasena->execute()) {
-                header("Location: perfil.php?mensaje=Contraseña actualizada con éxito");
-                exit();
-            } else {
-                $error_contrasena = "Error al actualizar la contraseña.";
+    while ($row = $result->fetch_assoc()) {
+        $movie_id = $row['movie_id'];
+        $url = "https://api.themoviedb.org/3/movie/$movie_id?api_key=$api_key&language=es-ES";
+        $response = file_get_contents($url);
+        
+        if ($response !== FALSE) {
+            $movie_data = json_decode($response, true);
+            if ($movie_data && isset($movie_data['poster_path'])) {
+                $favoritos[] = [
+                    'id' => $movie_id,
+                    'titulo' => $movie_data['title'],
+                    'poster_path' => $image_base_url . $movie_data['poster_path']
+                ];
             }
-        } else {
-            $error_contrasena = "Las nuevas contraseñas no coinciden.";
         }
-    } else {
-        $error_contrasena = "La contraseña actual es incorrecta.";
     }
+
+    return $favoritos;
 }
+
+
+
+
+// Función para obtener listas personalizadas
+function obtenerListas($usuario_id, $conn) {
+    $stmt = $conn->prepare("SELECT * FROM listas WHERE usuario_id = ?");
+    $stmt->bind_param("i", $usuario_id);
+    $stmt->execute();
+    return $stmt->get_result();
+}
+
+// Función para obtener estadísticas de visualización
+function obtenerEstadisticas($usuario_id, $conn) {
+    $stmt = $conn->prepare("SELECT COUNT(*) AS total_vistas, AVG(calificacion) AS calificacion_promedio FROM historial WHERE usuario_id = ?");
+    $stmt->bind_param("i", $usuario_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+// Obtener datos
+$historial = obtenerHistorialVisualizacion($usuario_id, $conn);
+$favoritos = obtenerFavoritos($usuario_id, $conn);
+$listas = obtenerListas($usuario_id, $conn);
+$estadisticas = obtenerEstadisticas($usuario_id, $conn);
 ?>
 
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Perfil de Usuario</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/css/perfil.css">
 </head>
 <body>
-    <div class="container mt-4">
-        <h2>Perfil de Usuario</h2>
+    <div class="perfil-container">
+        <h1>Bienvenido, <?php echo htmlspecialchars($_SESSION['nombre_usuario']); ?></h1>
 
-        <?php if (isset($_GET['mensaje'])): ?>
-            <div class="alert alert-success">
-                <?php echo htmlspecialchars($_GET['mensaje']); ?>
-            </div>
-        <?php endif; ?>
+        <!-- Sección de Estadísticas -->
+        <section class="estadisticas">
+            <h2>Estadísticas de Visualización</h2>
+            <p>Total de Películas Vistas: <?php echo $estadisticas['total_vistas']; ?></p>
+            <p>Calificación Promedio: <?php echo number_format($estadisticas['calificacion_promedio'], 1); ?> / 5</p>
+        </section>
 
-        <!-- Mostrar el perfil -->
-        <form action="perfil.php" method="POST">
-            <div class="form-group">
-                <label for="nombre_usuario">Nombre de Usuario:</label>
-                <input type="text" name="nombre_usuario" class="form-control" value="<?php echo htmlspecialchars($usuario['nombre_usuario']); ?>" required>
-            </div>
-            <div class="form-group">
-                <label for="email">Correo Electrónico:</label>
-                <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($usuario['email']); ?>" required>
-            </div>
-            <?php if ($error): ?>
-                <div class="alert alert-danger mt-2">
-                    <?php echo htmlspecialchars($error); ?>
-                </div>
-            <?php endif; ?>
-            <button type="submit" name="actualizar_perfil" class="btn btn-primary">Actualizar Perfil</button>
-        </form>
+ <!-- Sección de Historial -->
+<section class="historial">
+    <h2>Historial de Visualización</h2>
+    <?php if ($historial->num_rows > 0): ?>
+        <ul class="historial-list">
+            <?php while ($row = $historial->fetch_assoc()): ?>
+                <li class="historial-item">
+                    <h4><?php echo htmlspecialchars($row['titulo']); ?></h4>
+                    <p><strong>Visto el:</strong> <?php echo $row['fecha_visualizacion'] !== '0000-00-00' ? $row['fecha_visualizacion'] : 'Fecha no disponible'; ?></p>
+                    <p><strong>Estado:</strong> <?php echo !empty($row['estado']) ? htmlspecialchars($row['estado']) : 'No especificado'; ?></p>
+                    <p><strong>Calificación:</strong> <?php echo $row['calificacion'] > 0 ? $row['calificacion'] . "/5" : 'No calificado'; ?></p>
+                    <p><strong>Comentario:</strong> <?php echo !empty($row['comentario']) ? htmlspecialchars($row['comentario']) : 'Sin comentario'; ?></p>
+                </li>
+            <?php endwhile; ?>
+        </ul>
+    <?php else: ?>
+        <p>No has visto ninguna película aún.</p>
+    <?php endif; ?>
+</section>
 
-        <hr>
 
-        <!-- Cambiar contraseña -->
-        <h3>Cambiar Contraseña</h3>
-        <form action="perfil.php" method="POST">
-            <div class="form-group">
-                <label for="contrasena_actual">Contraseña Actual:</label>
-                <input type="password" name="contrasena_actual" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="nueva_contrasena">Nueva Contraseña:</label>
-                <input type="password" name="nueva_contrasena" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="confirmar_contrasena">Confirmar Nueva Contraseña:</label>
-                <input type="password" name="confirmar_contrasena" class="form-control" required>
-            </div>
-            <button type="submit" name="cambiar_contrasena" class="btn btn-warning">Cambiar Contraseña</button>
 
-            <?php if (isset($error_contrasena)): ?>
-                <div class="alert alert-danger mt-2">
-                    <?php echo htmlspecialchars($error_contrasena); ?>
-                </div>
-            <?php endif; ?>
-        </form>
+<!-- Sección de Favoritos -->
+<section class="favoritos">
+    <h2>Películas Favoritas</h2>
+    <?php if (!empty($favoritos)): ?>
+        <ul class="favoritos-list">
+            <?php foreach ($favoritos as $movie): ?>
+                <li class="favorito-item">
+                    <img src="<?php echo $movie['poster_path']; ?>" alt="<?php echo htmlspecialchars($movie['titulo']); ?>" class="favorito-poster">
+                    <span><?php echo htmlspecialchars($movie['titulo']); ?></span>
+                    <a href="eliminar_favorito.php?id=<?php echo $movie['id']; ?>" class="btn-eliminar">Eliminar</a>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php else: ?>
+        <p>No tienes películas favoritas aún.</p>
+    <?php endif; ?>
+</section>
+
+<!-- Formulario para crear una nueva lista personalizada -->
+<section class="crear-lista mt-4">
+    <h2>Crea una Nueva Lista</h2>
+    <form action="crear_lista.php" method="POST">
+        <input type="text" name="nombre" placeholder="Nombre de la lista" required class="form-control mb-2">
+        <textarea name="descripcion" placeholder="Descripción de la lista (opcional)" class="form-control mb-2"></textarea>
+        <select name="privacidad" class="form-control mb-2">
+            <option value="privada">Privada</option>
+            <option value="publica">Pública</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Crear Lista</button>
+    </form>
+</section>
+
+
+    <!-- Sección de Listas Personalizadas -->
+<section class="listas mt-4">
+    <h2>Mis Listas</h2>
+    <?php if ($listas->num_rows > 0): ?>
+        <ul>
+            <?php while ($row = $listas->fetch_assoc()): ?>
+                <li>
+                    <strong><?php echo htmlspecialchars($row['nombre']); ?></strong> - <?php echo htmlspecialchars($row['descripcion']); ?><br>
+                    <a href="ver_lista.php?id=<?php echo $row['id']; ?>">Ver Lista</a> |
+                    <a href="agregar_pelicula_lista.php?id=<?php echo $row['id']; ?>">Agregar Películas</a>
+                </li>
+            <?php endwhile; ?>
+        </ul>
+    <?php else: ?>
+        <p>No tienes listas personalizadas aún.</p>
+    <?php endif; ?>
+</section>
+
     </div>
 </body>
 </html>

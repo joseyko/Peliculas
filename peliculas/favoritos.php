@@ -1,40 +1,36 @@
 <?php
 session_start();
-include '../includes/conexion.php';
-include_once 'funciones.php'; // Asegúrate de usar include_once y la ruta correcta
+include_once '../includes/conexion.php';
 
-if (!isset($_SESSION['usuario_id'])) {
-    header("Location: auth/login2.php");
+$usuario_id = $_SESSION['usuario_id'];
+$movie_id = isset($_POST['movie_id']) ? $_POST['movie_id'] : null;
+
+// Verificar que el usuario esté autenticado y que se reciba el ID de la película
+if (!$usuario_id || !$movie_id) {
+    echo json_encode(['error' => 'Usuario no autenticado o ID de película no proporcionado']);
     exit();
 }
 
-$usuario_id = $_SESSION['usuario_id'];
-$movie_id = isset($_POST['movie_id']) ? intval($_POST['movie_id']) : 0;
+// Comprobar si la película ya está en favoritos
+$stmt = $conn->prepare("SELECT * FROM favoritos WHERE usuario_id = ? AND movie_id = ?");
+$stmt->bind_param("ii", $usuario_id, $movie_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$en_favoritos = $result->num_rows > 0;
+$stmt->close();
 
-// Función para agregar o eliminar de favoritos
-function toggleFavorito($conn, $usuario_id, $movie_id) {
-    if (esFavorito($conn, $usuario_id, $movie_id)) { // Llamada a esFavorito, que ahora debería estar disponible
-        $stmt_delete = $conn->prepare("DELETE FROM favoritos WHERE usuario_id = ? AND movie_id = ?");
-        $stmt_delete->bind_param("ii", $usuario_id, $movie_id);
-        $stmt_delete->execute();
-        $stmt_delete->close();
-        return "Eliminado de favoritos";
-    } else {
-        $stmt_insert = $conn->prepare("INSERT INTO favoritos (usuario_id, movie_id) VALUES (?, ?)");
-        $stmt_insert->bind_param("ii", $usuario_id, $movie_id);
-        $stmt_insert->execute();
-        $stmt_insert->close();
-        return "Agregado a favoritos";
-    }
-}
-
-// Ejecutar acción de agregar o quitar favoritos y redirigir
-if ($movie_id) {
-    $mensaje = toggleFavorito($conn, $usuario_id, $movie_id);
-    header("Location: peliculas.php?favorito_exito=1&mensaje=" . urlencode($mensaje));
+// Añadir o eliminar de favoritos según el estado actual
+if ($en_favoritos) {
+    $stmt = $conn->prepare("DELETE FROM favoritos WHERE usuario_id = ? AND movie_id = ?");
+    $stmt->bind_param("ii", $usuario_id, $movie_id);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['success' => 'Eliminado de favoritos']);
 } else {
-    header("Location: peliculas.php?favorito_exito=0&mensaje=" . urlencode("Error: No se pudo agregar a favoritos."));
+    $stmt = $conn->prepare("INSERT INTO favoritos (usuario_id, movie_id) VALUES (?, ?)");
+    $stmt->bind_param("ii", $usuario_id, $movie_id);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['success' => 'Añadido a favoritos']);
 }
-
-$conn->close();
-exit();
+?>
