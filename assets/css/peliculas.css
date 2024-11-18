@@ -13,7 +13,7 @@ body {
     color: #ffffff;
 }
 
-.navbar-fixed-top {
+/*.navbar-fixed-top {
     position: fixed;
     top: 0;
     width: 100%;
@@ -44,7 +44,7 @@ body {
 .navbar-fixed-top a:hover {
     background-color: #ff6500;
 }
-
+*/
 .content-container {
     padding-top: 80px;
     max-width: 1200px;
@@ -52,13 +52,18 @@ body {
 }
 
 /* Estilo de Búsqueda Avanzada */
-.advanced-search {
-    margin: 20px 0;
+.custom-input {
+    background-color: #333333; /* Color de fondo oscuro para contrastar */
+    border: 1px solid #5ce0e6; /* Borde en color azul claro */
+    color: #ffffff; /* Texto blanco */
 }
 
-.advanced-search input {
-    margin-right: 10px;
+.custom-input:focus {
+    border-color: #5ce0e6; /* Color de borde cuando está en foco */
+    box-shadow: 0 0 5px rgba(92, 224, 230, 0.5); /* Sombra suave */
 }
+
+/*tarjetas con bootstrap*/
 
 .movie-card {
     width: 180px;
@@ -78,15 +83,16 @@ body {
 }
 
 .rating-stars {
-    color: #ffdd57;
-    font-size: 1.5rem;
+    color: #5ce0e6 !important; /* Color de las estrellas */
+    font-size: 2rem !important; /* Tamaño más grande */
     text-align: center;
     margin-top: 8px;
 }
 
+
 .section-title {
     font-size: 1.8rem;
-    color: #ff8500;
+    color: #f5c518;
     text-align: center;
     margin: 30px 0 15px;
     font-weight: 600;
@@ -152,7 +158,7 @@ body {
 
 .carousel-controls .prev:hover,
 .carousel-controls .next:hover {
-    background-color: #ff8500;
+    background-color: #f5c518;
 }
 
 /* Estilo de las tarjetas de películas */
@@ -220,7 +226,7 @@ body {
 
 .lista-personalizada h4 {
     font-size: 1.2rem;
-    color: #ff8500;
+    color: #f5c518;
     margin-bottom: 10px;
 }
 
@@ -236,66 +242,36 @@ body {
 }
 
 /* Footer */
-.footer {
-    background-color: #333;
-    color: #fff;
-    padding: 20px 0;
-    margin-top: 40px;
-    text-align: center;
-}
-
-.footer-content {
-    display: flex;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    padding: 10px 0;
-}
-
-.footer-section {
-    flex: 1 1 200px;
-    padding: 10px;
-    text-align: left;
-}
-
-.footer-section h4 {
-    margin-bottom: 10px;
-    font-weight: 600;
-    color: #ff8500;
-}
-
-.footer-section ul {
-    list-style-type: none;
-    padding: 0;
-}
-
-.footer-section ul li {
-    margin-bottom: 8px;
-}
-
-.footer-section ul li a {
+footer {
+    width: 100vw;
+    position: relative;
+    left: 0;
+    right: 0;
+    background-color: #121212;
     color: #ffffff;
-    text-decoration: none;
-    transition: color 0.3s;
 }
 
-.footer-section ul li a:hover {
-    color: #ff8500;
+
+footer .text-muted {
+    font-size: 0.85rem;
+    color: #cccccc !important;
 }
 
-.footer-bottom {
-    margin-top: 20px;
-    font-size: 0.9rem;
-}
-
-.footer-section a {
-    color: #ff8500;
-    text-decoration: none;
-    margin: 0 5px;
-}
-
-.footer-section a:hover {
+footer a:hover {
     text-decoration: underline;
+    color: #f5c518 !important;
 }
+
+footer .bi {
+    transition: transform 0.3s ease;
+}
+
+footer .bi:hover {
+    transform: scale(1.2);
+    color: #f5c518;
+}
+
+
 
 /* Botón Volver Arriba */
 #volver-arriba {
@@ -305,7 +281,7 @@ body {
     right: 20px;
     width: 50px;
     height: 50px;
-    background-color: #ff8500;
+    background-color: #f5c518;
     color: #fff;
     font-size: 1.5rem;
     border: none;
@@ -317,7 +293,7 @@ body {
 }
 
 #volver-arriba:hover {
-    background-color: #ff6500;
+    background-color: #6acaf7;
 }
 
 /* Estilo de Filtros */
@@ -335,7 +311,7 @@ body {
 
 .filtro-container h3 {
     font-size: 1.6rem;
-    color: #ff8500;
+    color: #f5c518;
     margin-bottom: 15px;
 }
 
@@ -364,14 +340,14 @@ body {
 .filtro-form input[type="text"]:focus,
 .filtro-form input[type="number"]:focus,
 .filtro-form select:focus {
-    border-color: #ff8500;
+    border-color: #f5c518;
     outline: none;
     box-shadow: 0px 0px 8px rgba(255, 133, 0, 0.6);
 }
 
 .filtro-form button[type="submit"] {
     padding: 10px 20px;
-    background-color: #ff8500;
+    background-color: #f5c518;
     color: #ffffff;
     border: none;
     font-size: 1rem;

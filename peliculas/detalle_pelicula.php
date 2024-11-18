@@ -3,7 +3,7 @@
 session_start();
 
 // Incluir el archivo de conexión a la base de datos
-include '../includes/conexion.php'; // Ajusta la ruta si es necesario
+include '../includes/conexion.php';
 
 // Verifica que el ID de la película esté presente en la URL
 if (!isset($_GET['id']) || empty($_GET['id'])) {
@@ -11,14 +11,10 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
     exit();
 }
 
-// Reemplaza 'YOUR_API_KEY' con tu clave de API de TMDb
+// API Key y configuración
 $api_key = '56ca5cf36846fb5c1465bf82478749b5';
 $movie_id = intval($_GET['id']);
-echo "<p>ID de la película en detalle_pelicula.php: " . $movie_id . "</p>"; // Depuración: muestra el ID de la película en la página
-
 $url = 'https://api.themoviedb.org/3/movie/' . $movie_id . '?api_key=' . $api_key . '&language=es-ES';
-
-// Realizar la solicitud HTTP para obtener detalles de la película
 $response = file_get_contents($url);
 $data = json_decode($response, true);
 
@@ -27,14 +23,26 @@ if (!$data || isset($data['status_code'])) {
     exit();
 }
 
-// Inicializar $estado con un valor predeterminado
-$estado = 'Por Ver';
+// Solicitud para obtener trailers y videos de la película
+$videos_url = "https://api.themoviedb.org/3/movie/{$movie_id}/videos?api_key={$api_key}&language=es-ES";
+$videos_response = file_get_contents($videos_url);
+$videos_data = json_decode($videos_response, true);
 
-// Verificar si el usuario ha visto la película y cargar el estado si existe
-if (isset($_SESSION['usuario_id'])) {
-    $usuario_id = $_SESSION['usuario_id'];
+// Asegurarse de que $videos_data esté definido incluso si no hay resultados
+if (!$videos_data || !isset($videos_data['results'])) {
+    $videos_data = ['results' => []];
+}
+
+// Consultar comentarios relacionados con la película
+$usuario_id = $_SESSION['usuario_id'] ?? null;
+$estado = 'Por Ver';
+$en_favoritos = false;
+$resultado_comentarios = null;
+
+if ($usuario_id) {
+    // Verificar progreso del usuario
     $stmt = $conn->prepare("SELECT estado FROM historial WHERE usuario_id = ? AND pelicula_id = ?");
-    $stmt->bind_param("ii", $usuario_id, $movie_id); // Usa `pelicula_id` en la consulta
+    $stmt->bind_param("ii", $usuario_id, $movie_id);
     $stmt->execute();
     $result = $stmt->get_result();
     if ($result->num_rows > 0) {
@@ -42,30 +50,29 @@ if (isset($_SESSION['usuario_id'])) {
         $estado = $row['estado'];
     }
     $stmt->close();
-}
 
-
-
-// Solicitud para obtener trailers y videos de la película
-$videos_url = 'https://api.themoviedb.org/3/movie/' . $movie_id . '/videos?api_key=' . $api_key;
-$videos_response = file_get_contents($videos_url);
-$videos_data = json_decode($videos_response, true);
-
-// URL base para obtener imágenes de TMDb
-$image_base_url = 'https://image.tmdb.org/t/p/w500';
-
-
-$usuario_id = isset($_SESSION['usuario_id']) ? $_SESSION['usuario_id'] : null;
-$en_favoritos = false;
-
-if ($usuario_id) {
+    // Verificar si está en favoritos
     $stmt = $conn->prepare("SELECT * FROM favoritos WHERE usuario_id = ? AND movie_id = ?");
     $stmt->bind_param("ii", $usuario_id, $movie_id);
     $stmt->execute();
     $result = $stmt->get_result();
     $en_favoritos = $result->num_rows > 0;
     $stmt->close();
+
+    // Consultar comentarios
+    $stmt_comentarios = $conn->prepare("
+        SELECT c.comentario, c.fecha, u.nombre_usuario 
+        FROM comentarios c 
+        JOIN usuarios u ON c.usuario_id = u.id 
+        WHERE c.movie_id = ? 
+        ORDER BY c.fecha DESC
+    ");
+    $stmt_comentarios->bind_param("i", $movie_id);
+    $stmt_comentarios->execute();
+    $resultado_comentarios = $stmt_comentarios->get_result();
 }
+
+$image_base_url = 'https://image.tmdb.org/t/p/w500';
 ?>
 
 <!DOCTYPE html>
@@ -74,234 +81,119 @@ if ($usuario_id) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($data['title']); ?> - Detalles de la Película</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Estilo Personalizado -->
+    <link rel="stylesheet" href="../assets/css/detalle_pelicula.css">
 </head>
-<body>
-    <div class="container mt-5">
-        <h1 class="text-center"><?php echo htmlspecialchars($data['title']); ?></h1>
-        
-        <div class="row mt-4">
+<body class="bg-dark text-light">
+    <!-- Barra superior -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow">
+        <div class="container">
+            <!-- Título de la película -->
+            <span class="navbar-brand fw-bold text-warning">
+                <?php echo htmlspecialchars($data['title']); ?>
+            </span>
+            <!-- Botón de volver a la lista -->
+            <a href="peliculas.php" class="btn btn-warning text-dark fw-bold">
+                <i class="bi bi-arrow-left-circle"></i> Volver a la lista
+            </a>
+        </div>
+    </nav>
+
+    <!-- Contenido principal -->
+    <div class="container mt-5 pt-5">
+        <!-- Tarjeta de detalles de la película -->
+        <div class="card bg-secondary shadow-lg border-0 d-flex flex-lg-row flex-column p-3">
             <!-- Imagen de la película -->
-            <div class="col-md-4">
+            <div class="col-lg-4 text-center">
                 <?php if (!empty($data['poster_path'])): ?>
-                    <img src="<?php echo $image_base_url . $data['poster_path']; ?>" alt="<?php echo htmlspecialchars($data['title']); ?>" class="img-fluid">
+                    <img src="<?php echo $image_base_url . $data['poster_path']; ?>" alt="<?php echo htmlspecialchars($data['title']); ?>" class="img-fluid rounded shadow-lg">
                 <?php else: ?>
-                    <img src="../assets/imagenes/default.png" alt="Imagen no disponible" class="img-fluid">
+                    <img src="../assets/imagenes/default.png" alt="Imagen no disponible" class="img-fluid rounded shadow-lg">
                 <?php endif; ?>
             </div>
-
             <!-- Detalles de la película -->
-            <div class="col-md-8">
-                <h3>Descripción</h3>
-                <p><?php echo htmlspecialchars($data['overview']); ?></p>
-                
-                <p><strong>Fecha de estreno:</strong> <?php echo htmlspecialchars($data['release_date']); ?></p>
-                <p><strong>Calificación:</strong> <?php echo htmlspecialchars($data['vote_average']); ?> / 10</p>
-                <p><strong>Duración:</strong> <?php echo htmlspecialchars($data['runtime']); ?> minutos</p>
-                
-                <h4>Géneros</h4>
-                <ul>
-                    <?php foreach ($data['genres'] as $genre): ?>
-                        <li><?php echo htmlspecialchars($genre['name']); ?></li>
-                    <?php endforeach; ?>
-                </ul>
-                
-                <h4>Producción</h4>
-                <ul>
-                    <?php foreach ($data['production_companies'] as $company): ?>
-                        <li><?php echo htmlspecialchars($company['name']); ?></li>
-                    <?php endforeach; ?>
-                </ul>
-                
-                <h4>Países de producción</h4>
-                <ul>
-                    <?php foreach ($data['production_countries'] as $country): ?>
-                        <li><?php echo htmlspecialchars($country['name']); ?></li>
-                    <?php endforeach; ?>
-                </ul>
-                
-                <a href="peliculas.php" class="btn btn-primary mt-3">Volver a la lista</a>
-
-         <!-- Botón de Favoritos -->
-         <?php if ($usuario_id): ?>
-                    <button id="favoritos-btn" class="btn btn-<?php echo $en_favoritos ? 'danger' : 'secondary'; ?> mt-3">
-                        <?php echo $en_favoritos ? 'Eliminar de Favoritos' : 'Añadir a Favoritos'; ?>
-                    </button>
-                <?php else: ?>
-                    <p>Inicia sesión para agregar a favoritos.</p>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php
-// Obtener las listas personalizadas del usuario
-$stmt_listas = $conn->prepare("SELECT id, nombre FROM listas WHERE usuario_id = ?");
-$stmt_listas->bind_param("i", $usuario_id);
-$stmt_listas->execute();
-$listas_usuario = $stmt_listas->get_result();
-?>
-
-<!-- Formulario para agregar a lista personalizada -->
-<?php if ($listas_usuario->num_rows > 0): ?>
-    <form action="agregar_a_lista.php" method="POST" class="mt-3">
-        <input type="hidden" name="pelicula_id" value="<?php echo $movie_id; ?>">
-        <label for="lista_id">Añadir a una lista:</label>
-        <select name="lista_id" required>
-            <?php while ($lista = $listas_usuario->fetch_assoc()): ?>
-                <option value="<?php echo $lista['id']; ?>"><?php echo htmlspecialchars($lista['nombre']); ?></option>
-            <?php endwhile; ?>
-        </select>
-        <button type="submit" class="btn btn-primary">Añadir</button>
-    </form>
-<?php else: ?>
-    <p>No tienes listas personalizadas. <a href="crear_lista.php">Crea una aquí</a>.</p>
-<?php endif; ?>
-
-<?php
-$stmt_listas->close();
-?>
-
-
-        <!-- Sección de Trailer -->
-        <div class="row mt-5">
-            <div class="col-12">
-                <h3>Trailer</h3>
-                <?php
-                if (!empty($videos_data['results'])) {
-                    foreach ($videos_data['results'] as $video) {
-                        // Mostrar solo videos de YouTube y de tipo Trailer
-                        if ($video['site'] === 'YouTube' && $video['type'] === 'Trailer') {
-                            echo '<div class="embed-responsive embed-responsive-16by9">';
-                            echo '<iframe class="embed-responsive-item" src="https://www.youtube.com/embed/' . $video['key'] . '" allowfullscreen></iframe>';
-                            echo '</div>';
-                            break; // Muestra solo el primer trailer
-                        }
-                    }
-                } else {
-                    echo "<p>No hay trailers disponibles para esta película.</p>";
-                }
-                ?>
-                
-                <?php if (isset($_SESSION['usuario_id'])): ?>
-                    <div class="mt-4">
-                        <h4>Califica esta Película</h4>
-                        <form action="guardar_calificacion.php" method="POST">
-                            <input type="hidden" name="movie_id" value="<?php echo $movie_id; ?>">
-                            <label for="calificacion">Calificación (1-5):</label>
-                            <select name="calificacion" required>
-                                <?php for ($i = 1; $i <= 5; $i++): ?>
-                                    <option value="<?php echo $i; ?>"><?php echo $i; ?></option>
-                                <?php endfor; ?>
-                            </select>
-                            <button type="submit" class="btn btn-primary">Enviar Calificación</button>
-                        </form>
-                    </div>
-                <?php else: ?>
-                    <p>Debes <a href="auth/login2.php">iniciar sesión</a> para calificar esta película.</p>
-                <?php endif; ?>
-
-                <?php
-                // Consulta para obtener la calificación promedio
-                $stmt = $conn->prepare("SELECT AVG(calificacion) AS promedio, COUNT(calificacion) AS total FROM calificaciones WHERE movie_id = ?");
-                $stmt->bind_param("i", $movie_id);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                $calificacion_data = $result->fetch_assoc();
-                ?>
-
-                <div class="mt-4">
-                    <h4>Calificación Promedio</h4>
-                    <?php if ($calificacion_data['total'] > 0): ?>
-                        <p><?php echo round($calificacion_data['promedio'], 1); ?> de 5 (<?php echo $calificacion_data['total']; ?> calificaciones)</p>
-                    <?php else: ?>
-                        <p>Aún no hay calificaciones para esta película.</p>
-                    <?php endif; ?>
-                </div>
-                <?php if (isset($_SESSION['usuario_id'])): ?>
-    <div class="mt-4">
-        <h4>Progreso de Visualización</h4>
-        <form action="actualizar_progreso.php" method="POST">
-            <input type="hidden" name="movie_id" value="<?php echo $movie_id; ?>">
-            <label for="estado">Estado:</label>
-            <select name="estado" required>
-                <option value="Por Ver" <?php if ($estado === 'Por Ver') echo 'selected'; ?>>Por Ver</option>
-                <option value="En Progreso" <?php if ($estado === 'En Progreso') echo 'selected'; ?>>En Progreso</option>
-                <option value="Visto" <?php if ($estado === 'Visto') echo 'selected'; ?>>Visto</option>
-            </select>
-            <button type="submit" class="btn btn-primary">Actualizar</button>
-        </form>
-    </div>
-<?php else: ?>
-    <p>Debes <a href="../auth/login2.php">iniciar sesión</a> para actualizar tu progreso.</p>
-<?php endif; ?>
-
-                
-                <!-- Formulario para comentarios -->
-                <?php
-                if (!isset($_SESSION['usuario_id'])) {
-                    echo "<p>Debes iniciar sesión para dejar un comentario.</p>";
-                } else {
-                    ?>
-                    <div class="mt-5">
-                        <h4>Deja tu Reseña</h4>
-                        <form action="guardar_comentario.php" method="POST">
-                            <input type="hidden" name="movie_id" value="<?php echo $movie_id; ?>">
-                            <div class="form-group">
-                                <textarea name="comentario" class="form-control" rows="4" placeholder="Escribe tu reseña aquí..." required></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Enviar Reseña</button>
-                        </form>
-                    </div>
-                    <?php
-                }
-
-                // Mostrar comentarios
-                $comentarios = $conn->prepare("SELECT c.comentario, c.fecha, u.nombre_usuario FROM comentarios c JOIN usuarios u ON c.usuario_id = u.id WHERE c.movie_id = ? ORDER BY c.fecha DESC");
-                $comentarios->bind_param("i", $movie_id);
-                $comentarios->execute();
-                $resultado_comentarios = $comentarios->get_result();
-
-                if ($resultado_comentarios->num_rows > 0): ?>
-                    <h4 class="mt-5">Comentarios de Usuarios</h4>
+            <div class="col-lg-8">
+                <div class="details p-3">
+                    <h2 class="text-warning"><?php echo htmlspecialchars($data['title']); ?></h2>
                     <ul class="list-unstyled">
-                        <?php while ($comentario = $resultado_comentarios->fetch_assoc()): ?>
-                            <li class="mb-3">
-                                <strong><?php echo htmlspecialchars($comentario['nombre_usuario']); ?></strong> 
-                                <span class="text-muted">(<?php echo $comentario['fecha']; ?>)</span>
-                                <p><?php echo htmlspecialchars($comentario['comentario']); ?></p>
-                            </li>
-                        <?php endwhile; ?>
+                        <li><strong>Estreno:</strong> <?php echo htmlspecialchars($data['release_date']); ?></li>
+                        <li><strong>Duración:</strong> <?php echo htmlspecialchars($data['runtime']); ?> minutos</li>
+                        <li><strong>Calificación:</strong> <?php echo htmlspecialchars($data['vote_average']); ?> / 10</li>
                     </ul>
-                <?php else: ?>
-                    <p class="mt-3">No hay comentarios para esta película.</p>
-                <?php endif;
-
-                $comentarios->close();
-                ?>
+                    <h4>Géneros</h4>
+                    <ul class="list-inline">
+                        <?php foreach ($data['genres'] as $genre): ?>
+                            <li class="list-inline-item badge bg-primary"><?php echo htmlspecialchars($genre['name']); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
             </div>
         </div>
-    </div>
-    <script>
-    document.getElementById('favoritos-btn').addEventListener('click', function () {
-        const btn = this;
-        const movieId = <?php echo $movie_id; ?>;
 
-        fetch('favoritos.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: `movie_id=${movieId}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                btn.classList.toggle('btn-danger');
-                btn.classList.toggle('btn-secondary');
-                btn.textContent = btn.classList.contains('btn-danger') ? 'Eliminar de Favoritos' : 'Añadir a Favoritos';
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    });
-    </script>
+        <!-- Progreso de visualización -->
+        <?php if ($usuario_id): ?>
+            <div class="mt-4">
+                <div class="card bg-dark shadow">
+                    <div class="card-body">
+                        <h4>Progreso de Visualización</h4>
+                        <form action="actualizar_progreso.php" method="POST" class="d-flex flex-column">
+                            <input type="hidden" name="movie_id" value="<?php echo $movie_id; ?>">
+                            <select name="estado" class="form-select mb-2" required>
+                                <option value="Por Ver" <?php if ($estado === 'Por Ver') echo 'selected'; ?>>Por Ver</option>
+                                <option value="En Progreso" <?php if ($estado === 'En Progreso') echo 'selected'; ?>>En Progreso</option>
+                                <option value="Visto" <?php if ($estado === 'Visto') echo 'selected'; ?>>Visto</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary">Actualizar</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- Tráiler -->
+        <?php if (!empty($videos_data['results'])): ?>
+            <div class="trailer-container mt-5">
+                <iframe src="https://www.youtube.com/embed/<?php echo htmlspecialchars($videos_data['results'][0]['key']); ?>" allowfullscreen></iframe>
+            </div>
+        <?php else: ?>
+            <p class="text-light text-center mt-3">No hay videos disponibles para esta película.</p>
+        <?php endif; ?>
+
+        <!-- Comentarios -->
+        <div class="comments-container mt-5">
+            <h3>Comentarios</h3>
+            <?php if ($resultado_comentarios && $resultado_comentarios->num_rows > 0): ?>
+                <div class="list-group">
+                    <?php while ($comentario = $resultado_comentarios->fetch_assoc()): ?>
+                        <div class="list-group-item bg-secondary text-light shadow-sm">
+                            <strong><?php echo htmlspecialchars($comentario['nombre_usuario']); ?></strong>
+                            <span class="text-muted float-end">(<?php echo $comentario['fecha']; ?>)</span>
+                            <p><?php echo htmlspecialchars($comentario['comentario']); ?></p>
+                        </div>
+                    <?php endwhile; ?>
+                </div>
+            <?php else: ?>
+                <p class="text-light">No hay comentarios para esta película.</p>
+            <?php endif; ?>
+
+            <!-- Formulario para añadir comentarios -->
+            <?php if ($usuario_id): ?>
+                <form action="guardar_comentario.php" method="POST" class="mt-3">
+                    <input type="hidden" name="movie_id" value="<?php echo $movie_id; ?>">
+                    <textarea name="comentario" rows="3" placeholder="Escribe tu reseña aquí..." class="form-control mb-3" required></textarea>
+                    <button type="submit" class="btn btn-primary">Enviar Reseña</button>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/detalle_pelicula.js"></script>
 </body>
 </html>
+
+

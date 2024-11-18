@@ -1,23 +1,69 @@
-.historial-list {
-    list-style: none;
-    padding: 0;
+body {
+    background-color: #121212;
+    color: #ffffff;
+    font-family: 'Poppins', sans-serif;
+}
+/* Barra de navegación */
+.navbar {
+    background-color: #1f1f1f;
+    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
 }
 
-.historial-item {
-    background-color: #333;
-    color: #fff;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+.navbar .navbar-brand {
+    font-size: 1.5rem;
+    color: #f5c518;
+    text-shadow: 0px 2px 5px rgba(255, 255, 0, 0.8);
 }
 
-.historial-item h4 {
-    margin: 0 0 8px;
-    font-size: 1.2em;
-    color: #ff8500;
+.navbar .nav-link {
+    font-size: 1rem;
+    transition: all 0.3s ease;
 }
 
-.historial-item p {
-    margin: 5px 0;
+.navbar .nav-link:hover {
+    color: #f5c518;
+    transform: scale(1.1);
+}
+
+/* Modales */
+.modal-content {
+    background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+    border-radius: 10px;
+}
+
+.modal-header {
+    border-bottom: 1px solid #444;
+}
+
+.modal-footer {
+    border-top: 1px solid #444;
+}
+
+
+h1 {
+    margin-bottom: 30px;
+    font-size: 2.5rem;
+    text-shadow: 0 4px 10px rgba(255, 204, 0, 0.6);
+}
+
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+}
+
+.progress-bar {
+    background-color: #f5c518;
+}
+
+.btn-danger {
+    transition: transform 0.3s ease;
+}
+
+.btn-danger:hover {
+    transform: scale(1.1);
+    box-shadow: 0 5px 15px rgba(255, 0, 0, 0.6);
 }

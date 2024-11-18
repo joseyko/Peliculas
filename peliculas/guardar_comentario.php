@@ -1,34 +1,48 @@
 <?php
 session_start();
-include '../includes/conexion.php'; // Conexión a la base de datos
+include '../includes/conexion.php'; // Ajusta la ruta según tu estructura
 
-// Verifica que el usuario esté autenticado
 if (!isset($_SESSION['usuario_id'])) {
-    header("Location: auth/login2.php"); // Redirigir al inicio de sesión si no está autenticado
+    header("Location: ../auth/login2.php");
     exit();
 }
 
-// Obtiene los datos del formulario
 $usuario_id = $_SESSION['usuario_id'];
-$movie_id = isset($_POST['movie_id']) ? intval($_POST['movie_id']) : 0;
 $comentario = isset($_POST['comentario']) ? trim($_POST['comentario']) : '';
+$movie_id = isset($_POST['movie_id']) ? intval($_POST['movie_id']) : 0;
 
-if ($movie_id && $comentario) {
-    // Insertar el comentario en la base de datos
-    $stmt = $conn->prepare("INSERT INTO comentarios (usuario_id, movie_id, comentario) VALUES (?, ?, ?)");
-    $stmt->bind_param("iis", $usuario_id, $movie_id, $comentario);
-
-    if ($stmt->execute()) {
-        header("Location: detalle_pelicula.php?id=" . $movie_id . "&mensaje=Comentario agregado exitosamente");
-        exit();
-    } else {
-        echo "Error: No se pudo guardar el comentario.";
-    }
-
-    $stmt->close();
-} else {
-    echo "Error: El comentario no puede estar vacío.";
+// Validar que el comentario y movie_id no estén vacíos
+if (empty($comentario) || $movie_id <= 0) {
+    echo "Comentario inválido o película no especificada.";
+    exit();
 }
 
+// Verificar si el movie_id existe en la tabla `peliculas`
+$stmt_verificar = $conn->prepare("SELECT id FROM peliculas WHERE id = ?");
+$stmt_verificar->bind_param("i", $movie_id);
+$stmt_verificar->execute();
+$resultado_verificar = $stmt_verificar->get_result();
+
+if ($resultado_verificar->num_rows === 0) {
+    echo "La película especificada no existe.";
+    exit();
+}
+
+// Insertar el comentario
+$stmt = $conn->prepare("INSERT INTO comentarios (usuario_id, movie_id, comentario, fecha) VALUES (?, ?, ?, NOW())");
+$stmt->bind_param("iis", $usuario_id, $movie_id, $comentario);
+
+try {
+    $stmt->execute();
+    echo "Comentario guardado exitosamente.";
+    header("Location: detalle_pelicula.php?id=" . $movie_id);
+    exit();
+} catch (mysqli_sql_exception $e) {
+    echo "Error al guardar el comentario: " . $e->getMessage();
+}
+
+$stmt_verificar->close();
+$stmt->close();
 $conn->close();
 ?>
+
