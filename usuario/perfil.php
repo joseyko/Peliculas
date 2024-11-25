@@ -10,11 +10,17 @@ if (!isset($_SESSION['usuario_id'])) {
 
 $usuario_id = $_SESSION['usuario_id'];
 
+
 // Manejar el formulario de edición del perfil
-if (isset($_POST['actualizar_perfil'])) {
-    $nombre_usuario = $_POST['nombre_usuario'];
-    $correo = $_POST['correo'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['actualizar_perfil'])) {
+    $nombre_usuario = $_POST['nombre_usuario'] ?? null;
+    $email = $_POST['email'] ?? null;
     $foto_perfil = $_FILES['foto_perfil'] ?? null;
+
+    if ($nombre_usuario === null || $email === null) {
+        echo "Error: Nombre de usuario o correo no proporcionado.";
+        exit();
+    }
 
     $directorio_destino = '../uploads/';
     if (!is_dir($directorio_destino)) {
@@ -32,19 +38,18 @@ if (isset($_POST['actualizar_perfil'])) {
         }
     }
 
-    // Preparar consulta SQL
-    if ($ruta_completa) {
-        $stmt = $conn->prepare("UPDATE usuarios SET nombre_usuario = ?, correo = ?, foto_perfil = ? WHERE id = ?");
-        $stmt->bind_param("sssi", $nombre_usuario, $correo, $ruta_completa, $usuario_id);
+     // Construir y ejecutar la consulta SQL
+     if ($ruta_completa) {
+        $stmt = $conn->prepare("UPDATE usuarios SET nombre_usuario = ?, email = ?, foto_perfil = ? WHERE id = ?");
+        $stmt->bind_param("sssi", $nombre_usuario, $email, $ruta_completa, $usuario_id);
     } else {
-        $stmt = $conn->prepare("UPDATE usuarios SET nombre_usuario = ?, correo = ? WHERE id = ?");
-        $stmt->bind_param("ssi", $nombre_usuario, $correo, $usuario_id);
+        $stmt = $conn->prepare("UPDATE usuarios SET nombre_usuario = ?, email = ? WHERE id = ?");
+        $stmt->bind_param("ssi", $nombre_usuario, $email, $usuario_id);
     }
 
-    // Ejecutar consulta y redirigir
     if ($stmt->execute()) {
         $_SESSION['nombre_usuario'] = $nombre_usuario;
-        $_SESSION['correo'] = $correo;
+        $_SESSION['email'] = $email;
         if ($ruta_completa) {
             $_SESSION['foto_perfil'] = $ruta_completa;
         }
@@ -129,48 +134,30 @@ $estadisticas = obtenerEstadisticas($usuario_id, $conn);
 </head>
 <body class="bg-dark text-light">
 
- <!-- Barra de navegación -->
- <nav class="navbar navbar-dark bg-dark shadow-sm fixed-top">
-        <div class="container">
-            <a class="navbar-brand" href="#">Mi Perfil</a>
-            <div class="dropdown">
-                <a class="nav-link dropdown-toggle text-light" href="#" id="perfilDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <img src="<?php echo $_SESSION['foto_perfil'] ?? '../assets/default-profile.png'; ?>" alt="Foto de perfil" class="rounded-circle" width="40">
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#editar-perfil">Editar Perfil</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="../auth/logout.php">Cerrar Sesión</a></li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+<!-- Barra de navegación -->
+<nav class="navbar navbar-dark bg-dark shadow-sm fixed-top">
+    <div class="container">
+        <a class="navbar-brand" href="peliculas.php">CineFlick</a>
+        <div class="dropdown">
+            <a class="nav-link dropdown-toggle text-light d-flex align-items-center" href="#" id="perfilDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <img src="<?php echo $_SESSION['foto_perfil'] ?? '../assets/default-profile.png'; ?>" alt="Foto de perfil" class="rounded-circle me-2" width="40">
+                <?php echo htmlspecialchars($_SESSION['nombre_usuario']); ?>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+    <li><a class="dropdown-item" href="../peliculas.php"><i class="bi bi-house-door me-2"></i>Inicio</a></li>
+    <li><a class="dropdown-item" href="historial.php"><i class="bi bi-clock-history me-2"></i>Mi Actividad</a></li>
+    <li><a class="dropdown-item" href="favoritos.php"><i class="bi bi-heart me-2"></i>Mis Favoritos</a></li>
+    <li><a class="dropdown-item" href="editar_perfil.php"><i class="bi bi-person-circle me-2"></i>Editar Perfil</a></li>
+    <li><a class="dropdown-item" href="ajustes.php"><i class="bi bi-gear me-2"></i>Configuración</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item text-danger" href="../auth/logout.php"><i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión</a></li>
+</ul>
 
-    <div class="container mt-5 pt-5">
-        <!-- Sección de edición del perfil -->
-        <section id="editar-perfil" class="mb-5">
-            <div class="card bg-secondary shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title text-warning">Editar Perfil</h2>
-                    <form method="POST" enctype="multipart/form-data">
-                        <div class="mb-3">
-                            <label for="nombre_usuario" class="form-label">Nombre de Usuario</label>
-                            <input type="text" id="nombre_usuario" name="nombre_usuario" class="form-control" value="<?php echo htmlspecialchars($_SESSION['nombre_usuario']); ?>" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="correo" class="form-label">Correo Electrónico</label>
-                            <input type="email" id="correo" name="correo" class="form-control" value="<?php echo htmlspecialchars($_SESSION['correo']); ?>" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="foto_perfil" class="form-label">Foto de Perfil</label>
-                            <input type="file" id="foto_perfil" name="foto_perfil" class="form-control">
-                        </div>
-                        <button type="submit" name="actualizar_perfil" class="btn btn-warning">Guardar Cambios</button>
-                    </form>
-                </div>
-            </div>
-        </section>
+        </div>
     </div>
+</nav>
+
+
 <!-- Contenido principal -->
 <div class="container mt-5">
     <h1 class="text-center text-warning mb-4">Bienvenido, <?php echo htmlspecialchars($_SESSION['nombre_usuario']); ?></h1>
